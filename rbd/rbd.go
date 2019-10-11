@@ -53,6 +53,7 @@ type RBDError int
 var (
 	RbdErrorImageNotOpen = errors.New("RBD image not open")
 	RbdErrorNotFound     = errors.New("RBD image not found")
+	RbdErrorWatcherParam = errors.New("RBD watcher not found")
 )
 
 //
@@ -82,7 +83,7 @@ type Locker struct {
 
 type Watcher struct {
 	Addr   string
-	ID     int64
+	Id     int64
 	Cookie uint64
 }
 
@@ -1003,19 +1004,12 @@ func (image *Image) ListWatchers() (watchers []Watcher, err error) {
 	if image.image == nil {
 		return nil, RbdErrorImageNotOpen
 	}
-
-	p, err := plugin.Open("/lib64/librbd.so.1")
-	if err != nil {
-		return nil, err
-	}
-	//find symbol named if not exist return not error
-	_, err = p.Lookup("rbd_watchers_list")
-	if err != nil {
-		return nil, nil
-	}
-
+	
 	var c_max_watchers C.size_t
 	ret := C.rbd_watchers_list(image.image, nil, &c_max_watchers)
+	if c_max_watchers == 0 {
+		return nil, RbdErrorWatcherParam
+	}
 
 	c_watchers := make([]C.rbd_image_watcher_t, c_max_watchers)
 	watchers = make([]Watcher, c_max_watchers)
@@ -1027,7 +1021,7 @@ func (image *Image) ListWatchers() (watchers []Watcher, err error) {
 
 	for i, w := range c_watchers {
 		watchers[i] = Watcher{Addr: C.GoString(w.addr),
-			ID:     int64(w.id),
+			Id:     int64(w.id),
 			Cookie: uint64(w.cookie)}
 	}
 	return watchers, nil
