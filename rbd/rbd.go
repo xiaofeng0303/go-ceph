@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"plugin"
 	"time"
 	"unsafe"
 
